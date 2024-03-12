@@ -76,6 +76,7 @@ class CompilationConfig:
         enable_cuda_graph: bool = False
         enable_triton: bool = False
         trace_scheduler: bool = False
+        disable_unet_optimize: bool = False
 
 
 def compile(m, config):
@@ -137,16 +138,17 @@ def compile_unet(m, config):
     if config.memory_format is not None:
         apply_memory_format(m, memory_format=config.memory_format)
 
-    if config.enable_jit:
-        lazy_trace_ = _build_lazy_trace(
-            config,
-            enable_triton_reshape=enable_cuda_graph,
-            enable_triton_layer_norm=enable_cuda_graph,
-        )
-        m.forward = lazy_trace_(m.forward)
+    if not config.disable_unet_optimize:
+        if config.enable_jit:
+            lazy_trace_ = _build_lazy_trace(
+                config,
+                enable_triton_reshape=enable_cuda_graph,
+                enable_triton_layer_norm=enable_cuda_graph,
+            )
+            m.forward = lazy_trace_(m.forward)
 
-    if enable_cuda_graph:
-        m.forward = make_dynamic_graphed_callable(m.forward)
+        if enable_cuda_graph:
+            m.forward = make_dynamic_graphed_callable(m.forward)
 
     return m
 
